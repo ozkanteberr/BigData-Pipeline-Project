@@ -3,7 +3,7 @@ Download the Olist Brazilian E-Commerce dataset from Kaggle.
 
 Requirements:
   - Kaggle account at https://www.kaggle.com
-  - API token at ~/.kaggle/kaggle.json  (Windows: %USERPROFILE%\.kaggle\kaggle.json)
+  - API token at ~/.kaggle/kaggle.json  (Windows: %USERPROFILE%\\.kaggle\\kaggle.json)
 
 Usage:
   python scripts/download_dataset.py
@@ -53,10 +53,10 @@ def download_dataset():
         quiet=False,
     )
 
-    print("\n✅ Download complete. Files:")
+    print("\nOK: Download complete. Files:")
     csv_files = sorted(output_dir.glob("*.csv"))
     if not csv_files:
-        print("  ⚠ No CSV files found — check the output directory.")
+        print("  WARNING: No CSV files found; check the output directory.")
     for f in csv_files:
         size_mb = f.stat().st_size / (1024 * 1024)
         print(f"  {f.name:<55} {size_mb:6.1f} MB")

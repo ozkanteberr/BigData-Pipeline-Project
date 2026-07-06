@@ -1,78 +1,62 @@
-# Big Data Analytics Pipeline — Olist E-Commerce
+# Big Data Analytics Pipeline - Olist E-Commerce
 
-A hands-on big data project built around the
-[Olist Brazilian E-Commerce public dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) —
-~100,000 real orders from Brazil's largest online marketplace (2016–2018).
+A Spark-based analytics pipeline for the Olist Brazilian E-Commerce public dataset. The current phase ingests the nine CSV tables, converts them to Parquet, stores them in HDFS, and exposes them to Apache Superset through Spark SQL tables.
 
-The project is developed in stages. Each stage adds a new layer to the pipeline. More stages will be added over time.
+Dataset: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
 
----
+## Architecture
 
-## 📌 Important Notes
-
-### Submission
-Each student must **fork or clone this repository**, implement their solution, and submit by **opening a Pull Request (PR) back to this repository** with their completed work. PRs are the only accepted submission method.
-
-### Docker is Optional
-The Docker Compose files and scripts provided in this repo are **starter code only** — a reference setup to help you get up and running quickly. You are **not required** to use Docker. Feel free to run HDFS, Spark, and Superset however you prefer (local install, cloud, a different container setup, etc.), as long as the pipeline works end-to-end.
-
----
-
-## Architecture (Phase 1)
-
-```
-[Olist Dataset — 9 CSV Tables]
+```text
+[Olist CSV files]
         |
         v
-[Apache Spark]
-  · Reads CSVs
-  · Writes Parquet
+[Apache Spark ingestion job]
         |
         v
-[HDFS or MinIO]
+[Parquet tables on HDFS]
         |
         v
-[Apache Superset — Simple Charts]
+[Spark SQL / ThriftServer]
+        |
+        v
+[Apache Superset charts]
 ```
 
----
+## Repository Layout
 
+```text
+processing/      Spark ingestion jobs
+visualization/   Spark SQL table registration helpers
+scripts/         Dataset download and environment setup helpers
+docker/          Optional local Docker Compose stack
+reports/         Project report and analysis notes
+```
 
-## Phases
+## Prerequisites
 
-### ✅ Phase 1 — Ingest & Visualize
+- Docker and Docker Compose, if using the included local stack
+- Python 3.11+, if running scripts locally
+- Kaggle API token at `~/.kaggle/kaggle.json`
 
-> **Current task**
+Install Python dependencies locally with:
 
-- Download the Olist dataset (9 CSV tables).
-- Import all CSVs into **HDFS or MinIO** in **Parquet format** using Apache Spark.
-- Connect Apache Superset to the stored data and create a few simple charts/diagrams.
+```bash
+pip install -r requirements.txt
+```
 
-No advanced transformations are required for this phase.
+## Quick Start With Docker
 
----
-
-### 🔜 Phase 2 — Coming Soon
-
-Details will be announced.
-
----
-
-## Docker Quick Start (Optional)
-
-The following commands use the provided Docker Compose files as a starting point.
-
-**1. Create the shared network**
+Create the shared Docker network:
 
 ```bash
 # Linux / macOS
 bash scripts/setup_network.sh
 
-# Windows (PowerShell)
+# Windows PowerShell
 .\scripts\setup_network.ps1
 ```
 
-**2. Start the services**
+Start HDFS, Spark, and Superset:
 
 ```bash
 docker compose -f docker/docker-compose-hdfs.yml up -d
@@ -80,16 +64,68 @@ docker compose -f docker/docker-compose-spark.yml up -d
 docker compose -f docker/docker-compose-superset.yml up -d
 ```
 
-| Service         | URL                       | Credentials   |
-|-----------------|---------------------------|---------------|
-| HDFS NameNode   | http://localhost:9870     |               |
-| Spark Master    | http://localhost:8080     |               |
-| Superset        | http://localhost:8088     | admin / admin |
+Useful URLs:
 
-**3. Stop everything**
+| Service       | URL                   | Credentials   |
+|---------------|-----------------------|---------------|
+| HDFS NameNode | http://localhost:9870 |               |
+| Spark Master  | http://localhost:8080 |               |
+| Superset      | http://localhost:8088 | admin / admin |
+
+## Download The Dataset
+
+```bash
+python scripts/download_dataset.py
+```
+
+This writes CSV files to `data/raw/`. The directory is ignored by git.
+
+## Convert CSV To Parquet
+
+Local output example:
+
+```bash
+python processing/analysis.py --input data/raw --output data/processed/parquet
+```
+
+HDFS output example from the dev container or Spark container:
+
+```bash
+spark-submit processing/analysis.py \
+  --input /app/data/raw \
+  --output hdfs://namenode:9000/user/olist/parquet
+```
+
+The job writes one Parquet dataset per CSV table, using table names such as `orders`, `customers`, and `order_items`.
+
+## Register Tables For Superset
+
+After the Parquet datasets are written, register them in Spark SQL:
+
+```bash
+spark-submit visualization/register_tables.py \
+  --input hdfs://namenode:9000/user/olist/parquet \
+  --database olist
+```
+
+Then connect Superset to Spark ThriftServer with a SQLAlchemy URI similar to:
+
+```text
+hive://spark-thriftserver:10000/olist
+```
+
+## Stop The Stack
 
 ```bash
 docker compose -f docker/docker-compose-superset.yml down
 docker compose -f docker/docker-compose-spark.yml down
 docker compose -f docker/docker-compose-hdfs.yml down
 ```
+
+## Current Phase
+
+- Ingest all Olist CSV files.
+- Convert them to Parquet with Spark.
+- Store outputs in HDFS.
+- Register queryable Spark SQL tables.
+- Build basic Superset charts from the registered tables.

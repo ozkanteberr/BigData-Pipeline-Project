@@ -1,5 +1,6 @@
-# Downloaded dataset (do not commit)
+# Downloaded dataset and generated outputs (do not commit)
 data/raw/
+data/processed/
 data/*.csv
 
 # Python
@@ -9,6 +10,13 @@ __pycache__/
 .venv/
 venv/
 
+# Spark / Hive local metadata
+*.crc
+_SUCCESS
+metastore_db/
+spark-warehouse/
+derby.log
+
 # IDE
 .idea/
 .vscode/
@@ -17,8 +25,3 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
-
-# Spark output
-*.crc
-_SUCCESS
-

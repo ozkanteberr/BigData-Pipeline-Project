@@ -1,8 +1,6 @@
-version: '3.8'
-
 # MinIO Infrastructure for Olist Big Data Pipeline
 # API:     http://localhost:9000  (S3-compatible endpoint)
-# Console: http://localhost:9001  (Web UI — login: minioadmin / minioadmin)
+# Console: http://localhost:9001  (Web UI ? login: minioadmin / minioadmin)
 # Bucket:  olist-data
 
 services:
