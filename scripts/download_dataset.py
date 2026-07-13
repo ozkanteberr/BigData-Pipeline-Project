@@ -15,17 +15,35 @@ from pathlib import Path
 
 
 def check_kaggle_credentials():
-    """Check that kaggle.json exists at the expected location."""
+    """Check that Kaggle credentials exist (JSON token, access_token file, or env var)."""
+    # New-style: environment variable
+    if os.environ.get("KAGGLE_API_TOKEN"):
+        print("Using KAGGLE_API_TOKEN environment variable.")
+        return
+
     home = Path.home()
+    # New-style: access_token file
+    access_token = home / ".kaggle" / "access_token"
+    if access_token.exists():
+        print(f"Using Kaggle access token: {access_token}")
+        return
+
+    # Old-style: kaggle.json
     kaggle_json = home / ".kaggle" / "kaggle.json"
-    if not kaggle_json.exists():
-        print("ERROR: Kaggle API credentials not found.")
-        print(f"Expected location: {kaggle_json}")
-        print("\nTo fix:")
-        print("  1. Go to https://www.kaggle.com/settings")
-        print("  2. Scroll to 'API' and click 'Create New Token'")
-        print(f"  3. Move the downloaded kaggle.json to: {kaggle_json}")
-        sys.exit(1)
+    if kaggle_json.exists():
+        print(f"Using Kaggle JSON credentials: {kaggle_json}")
+        return
+
+    print("ERROR: Kaggle API credentials not found.")
+    print(f"Expected one of:")
+    print(f"  - Environment variable KAGGLE_API_TOKEN")
+    print(f"  - {access_token}")
+    print(f"  - {kaggle_json}")
+    print("\nTo fix:")
+    print("  1. Go to https://www.kaggle.com/settings")
+    print("  2. Scroll to 'API' and create a token")
+    print(f"  3. Save the token to: {access_token}")
+    sys.exit(1)
 
 
 def download_dataset():

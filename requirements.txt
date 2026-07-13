@@ -1,4 +1,6 @@
+# Docker containers: pyspark + pyarrow (pre-installed in Spark images)
+# Local usage: kaggle + requests are sufficient
 pyspark==3.5.1
 kaggle==1.6.17
-pyarrow==16.1.0
+pyarrow==19.0.1
 requests==2.32.3
