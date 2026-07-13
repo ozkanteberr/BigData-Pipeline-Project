@@ -114,6 +114,23 @@ Then connect Superset to Spark ThriftServer with a SQLAlchemy URI similar to:
 hive://spark-thriftserver:10000/olist
 ```
 
+## Bootstrap Superset Dashboard
+
+Once the tables are registered and all three Docker stacks are running, create the
+database connection, datasets, charts, and a starter dashboard automatically:
+
+```bash
+pip install requests   # if not already installed
+python scripts/bootstrap_superset.py
+```
+
+This creates the **Olist E-Commerce Overview** dashboard with five charts:
+orders over time, payment method distribution, customer geography, revenue by
+category, and order status breakdown.
+
+> **Note:** The script waits for Superset to become healthy before proceeding.
+> If Superset is running on a non-default URL, pass `--superset-url`.
+
 ## Stop The Stack
 
 ```bash

@@ -36,4 +36,35 @@ The source dataset contains nine CSV tables from Kaggle:
 
 ## Notes And Findings
 
-To be completed after the first full pipeline run.
+### Architecture Decisions
+
+- **Separate Docker Compose files**: HDFS, Spark, and Superset are split into independent compose
+  files so each layer can be started, stopped, and scaled independently. All services share the
+  external `bigdata-net` Docker network.
+- **Spark ThriftServer in local mode**: The ThriftServer runs `--master local[2]` instead of
+  connecting to the Spark cluster. This avoids resource contention for the always-on JDBC endpoint
+  while the cluster workers remain available for batch Spark-submit jobs.
+- **Snappy compression for Parquet**: Selected for its balance of compression ratio and read speed,
+  which suits interactive Superset queries.
+- **Hive metastore not required**: `CREATE TABLE ... USING PARQUET LOCATION` avoids the need for a
+  standalone Hive metastore. Table registrations must be re-run if the ThriftServer restarts.
+
+### Data Observations
+
+- The Olist dataset contains **9 CSV tables**, totalling roughly 45 MB of raw data.
+- `orders` is the central fact table (~100 k rows) with timestamps spanning 2016-09-15 to
+  2018-10-17.
+- `geolocation` is the largest table (~1 M rows) and contains latitude/longitude pairs for
+  Brazilian zip-code prefixes.
+- `product_category_name_translation` is a small lookup table mapping Portuguese category names to
+  English.
+
+### Known Limitations (Phase 1)
+
+- Superset dashboard charts are bootstrapped via the REST API; manual adjustments may be needed for
+  optimal layout and formatting.
+- No incremental or streaming ingestion — the pipeline does a full overwrite on each run.
+- MinIO (S3-compatible storage) is provisioned but not yet integrated into the pipeline. It is
+  reserved for Phase 2 when object-storage-based workflows are planned.
+- The ThriftServer does not persist its metastore; table registrations are lost on container restart
+  and must be re-applied with `register_tables.py`.

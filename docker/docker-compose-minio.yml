@@ -10,7 +10,7 @@ services:
     hostname: minio
     restart: unless-stopped
     ports:
-      - "9000:9000"   # S3 API
+      - "9002:9000"   # S3 API (host 9002 to avoid HDFS port conflict)
       - "9001:9001"   # Console
     volumes:
       - minio_data:/data

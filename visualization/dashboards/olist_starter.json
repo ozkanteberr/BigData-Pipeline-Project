@@ -1,0 +1,84 @@
+{
+  "_meta": {
+    "description": "Starter Superset dashboard export for Olist Big Data Pipeline Phase 1.",
+    "version": "1.0.0",
+    "created_by": "bootstrap_superset.py"
+  },
+  "database": {
+    "database_name": "Spark Olist",
+    "sqlalchemy_uri": "hive://spark-thriftserver:10000/olist",
+    "expose_in_sqllab": true
+  },
+  "charts": [
+    {
+      "slice_name": "Orders Over Time",
+      "viz_type": "echarts_timeseries_line",
+      "table_name": "orders",
+      "description": "Monthly order count over time",
+      "params": {
+        "metrics": ["count"],
+        "time_column": "order_purchase_timestamp",
+        "time_grain_sqla": "P1M",
+        "row_limit": 10000
+      }
+    },
+    {
+      "slice_name": "Payment Method Distribution",
+      "viz_type": "pie",
+      "table_name": "order_payments",
+      "description": "Distribution of payment types across all orders",
+      "params": {
+        "metrics": ["count"],
+        "groupby": ["payment_type"],
+        "row_limit": 100
+      }
+    },
+    {
+      "slice_name": "Customer Geography — Top 20 Cities",
+      "viz_type": "echarts_timeseries_bar",
+      "table_name": "customers",
+      "description": "Top 20 cities by customer count",
+      "params": {
+        "metrics": ["count"],
+        "groupby": ["customer_city"],
+        "order_desc": true,
+        "row_limit": 20
+      }
+    },
+    {
+      "slice_name": "Revenue by Product Category",
+      "viz_type": "echarts_timeseries_bar",
+      "table_name": "order_items",
+      "description": "Total revenue per product category (top 15)",
+      "params": {
+        "metrics": [
+          {
+            "label": "total_revenue",
+            "expressionType": "SQL",
+            "sqlExpression": "SUM(price)"
+          }
+        ],
+        "groupby": ["product_id"],
+        "order_desc": true,
+        "row_limit": 15
+      }
+    },
+    {
+      "slice_name": "Order Status Breakdown",
+      "viz_type": "pie",
+      "table_name": "orders",
+      "description": "Breakdown of orders by their current status",
+      "params": {
+        "metrics": ["count"],
+        "groupby": ["order_status"],
+        "row_limit": 50
+      }
+    }
+  ],
+  "dashboard": {
+    "dashboard_title": "Olist E-Commerce Overview",
+    "slug": "olist-overview",
+    "published": true,
+    "description": "Phase 1 starter dashboard with order trends, payment analysis, and customer geography."
+  }
+}

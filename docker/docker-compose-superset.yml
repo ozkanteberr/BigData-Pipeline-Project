@@ -45,6 +45,8 @@ services:
       SUPERSET_SECRET_KEY: "olist-bigdata-secret-change-in-prod"
       SUPERSET_LOAD_EXAMPLES: "no"
       PYTHONPATH: /app/pythonpath
+    volumes:
+      - ./superset_config.py:/app/pythonpath/superset_config.py:ro
     depends_on:
       superset-db:
         condition: service_healthy
