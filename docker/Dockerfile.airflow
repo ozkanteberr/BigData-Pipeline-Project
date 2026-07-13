@@ -1,0 +1,15 @@
+FROM apache/airflow:2.9.1-python3.10
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsasl2-dev \
+    gcc \
+    g++ \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+# dbt-spark with PyHive handles connections to Spark ThriftServer
+RUN pip install --no-cache-dir \
+    dbt-spark[PyHive]==1.7.1 \
+    dbt-core==1.7.1

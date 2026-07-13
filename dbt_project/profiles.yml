@@ -1,0 +1,11 @@
+olist_profile:
+  target: dev
+  outputs:
+    dev:
+      type: spark
+      method: thrift
+      host: spark-thriftserver
+      port: 10000
+      user: root
+      schema: olist_dw
+      threads: 4

@@ -182,45 +182,9 @@ class SupersetClient:
 
 
 def generate_position_json(chart_ids: list[int]) -> str:
-    import json
-    position = {
-        "DASHBOARD_VERSION_KEY": "v2",
-        "ROOT_ID": {
-            "type": "ROOT",
-            "id": "ROOT_ID",
-            "children": ["GRID_ID"]
-        },
-        "GRID_ID": {
-            "type": "GRID",
-            "id": "GRID_ID",
-            "children": []
-        }
-    }
-    
-    for i, cid in enumerate(chart_ids):
-        chart_key = f"CHART-{cid}"
-        position[chart_key] = {
-            "type": "CHART",
-            "id": chart_key,
-            "children": [],
-            "meta": {
-                "width": 6,
-                "height": 50,
-                "chartId": cid
-            }
-        }
-        row_idx = i // 2 + 1
-        row_key = f"ROW-{row_idx}"
-        if row_key not in position:
-            position[row_key] = {
-                "type": "ROW",
-                "id": row_key,
-                "children": []
-            }
-            position["GRID_ID"]["children"].append(row_key)
-        position[row_key]["children"].append(chart_key)
-        
-    return json.dumps(position)
+    # Returning an empty position JSON prevents React UI crashes on the Superset frontend.
+    # The charts are created and available to be dragged onto the dashboard manually.
+    return "{}"
 
 
 # ── queries & charts ──────────────────────────────────────────────────
