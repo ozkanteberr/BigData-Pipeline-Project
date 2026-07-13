@@ -88,10 +88,11 @@ Local output example:
 python processing/analysis.py --input data/raw --output data/processed/parquet
 ```
 
-HDFS output example from the dev container or Spark container:
+HDFS output example from the host machine via Docker:
 
 ```bash
-spark-submit processing/analysis.py \
+docker exec -it spark-master /spark/bin/spark-submit \
+  /app/processing/analysis.py \
   --input /app/data/raw \
   --output hdfs://namenode:9000/user/olist/parquet
 ```
@@ -103,7 +104,8 @@ The job writes one Parquet dataset per CSV table, using table names such as `ord
 After the Parquet datasets are written, register them in Spark SQL:
 
 ```bash
-spark-submit visualization/register_tables.py \
+docker exec -it spark-master /spark/bin/spark-submit \
+  /app/visualization/register_tables.py \
   --input hdfs://namenode:9000/user/olist/parquet \
   --database olist
 ```
