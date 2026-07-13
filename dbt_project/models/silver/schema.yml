@@ -1,0 +1,10 @@
+version: 2
+
+models:
+  - name: silver_geolocation
+    description: "Cleaned geolocation data"
+    columns:
+      - name: geolocation_zip_code_prefix
+        description: "Zip code prefix"
+        tests:
+          - not_null

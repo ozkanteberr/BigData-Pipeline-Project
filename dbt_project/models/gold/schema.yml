@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Dimension table for customers"
+    columns:
+      - name: customer_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      - name: customer_unique_id
+        description: "Unique identifier for a customer"
+        tests:
+          - not_null
+
+  - name: dim_orders
+    description: "Dimension table for orders"
+    columns:
+      - name: order_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      - name: order_status
+        description: "Status of the order"
+        tests:
+          - accepted_values:
+              values: ['delivered', 'shipped', 'invoiced', 'processing', 'created', 'unavailable', 'canceled', 'approved']
+
+  - name: fact_order_items
+    description: "Fact table for order items"
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: order_item_id
+        tests:
+          - not_null
+      - name: price
+        tests:
+          - not_null
