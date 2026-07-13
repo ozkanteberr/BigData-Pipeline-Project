@@ -144,7 +144,16 @@ class SupersetClient:
 
     # ── dashboard ─────────────────────────────────────────────────
 
+    def find_dashboard(self, slug: str) -> int | None:
+        data = self._get("/api/v1/dashboard/", params={"q": f"(filters:!((col:slug,opr:eq,value:'{slug}')))"})
+        results = data.get("result", [])
+        return results[0]["id"] if results else None
+
     def create_dashboard(self, title: str, slug: str, chart_ids: list[int]) -> int:
+        existing_id = self.find_dashboard(slug)
+        if existing_id:
+            print(f"  -> Dashboard '{title}' already exists (id={existing_id}).")
+            return existing_id
         data = self._post("/api/v1/dashboard/", {
             "dashboard_title": title,
             "slug": slug,
