@@ -1,12 +1,11 @@
 """
-Bootstrap Apache Superset with a Spark ThriftServer connection,
-starter charts, and a dashboard for the Olist Big Data Pipeline.
+Bootstrap Apache Superset with the olist_dw Star Schema database,
+virtual joined datasets, 7 BI charts, and a Business BI Dashboard.
 
 This script talks to the Superset REST API v1.
 
 Usage:
-  python scripts/bootstrap_superset.py
-  python scripts/bootstrap_superset.py --superset-url http://localhost:8088
+  python scripts/bootstrap_dw_superset.py
 """
 
 from __future__ import annotations
@@ -21,15 +20,15 @@ DEFAULT_SUPERSET_URL = "http://localhost:8088"
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin"
 
-SPARK_DB_NAME = "Spark Olist"
-SPARK_SQLALCHEMY_URI = "hive://spark-thriftserver:10000/olist"
+SPARK_DW_DB_NAME = "Spark Olist DW"
+SPARK_DW_SQLALCHEMY_URI = "hive://spark-thriftserver:10000/olist_dw"
 
 
 # ── helpers ───────────────────────────────────────────────────────────
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Bootstrap Superset with Olist Spark connection, charts, and dashboard."
+        description="Bootstrap Superset with Olist Star Schema DW connection, charts, and dashboard."
     )
     parser.add_argument(
         "--superset-url",
@@ -77,9 +76,13 @@ class SupersetClient:
     def _post(self, endpoint: str, json_body: dict) -> dict:
         resp = self.session.post(f"{self.base_url}{endpoint}", json=json_body)
         if resp.status_code == 409:
-            print(f"  ↳ Already exists (409), skipping.")
+            print("  -> Already exists (409), skipping.")
             return resp.json() if resp.text else {}
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP Error details: {resp.text}")
+            raise e
         return resp.json()
 
     def _get(self, endpoint: str, params: dict | None = None) -> dict:
@@ -120,18 +123,18 @@ class SupersetClient:
         results = data.get("result", [])
         return results[0]["id"] if results else None
 
-    def create_dataset(self, table_name: str, database_id: int, schema: str = "olist") -> int:
-        existing_id = self.find_dataset(table_name, database_id)
+    def create_virtual_dataset(self, name: str, sql: str, database_id: int) -> int:
+        existing_id = self.find_dataset(name, database_id)
         if existing_id:
-            print(f"  -> Dataset '{table_name}' already exists (id={existing_id}).")
+            print(f"  -> Virtual Dataset '{name}' already exists (id={existing_id}).")
             return existing_id
         data = self._post("/api/v1/dataset/", {
             "database": database_id,
-            "table_name": table_name,
-            "schema": schema,
+            "table_name": name,
+            "sql": sql,
         })
         ds_id = data.get("id")
-        print(f"  -> Created dataset '{table_name}' (id={ds_id}).")
+        print(f"  -> Created virtual dataset '{name}' (id={ds_id}).")
         return ds_id
 
     # ── chart ─────────────────────────────────────────────────────
@@ -155,50 +158,99 @@ class SupersetClient:
         return dash_id
 
 
-# ── chart definitions ─────────────────────────────────────────────────
+# ── queries & charts ──────────────────────────────────────────────────
 
-def build_chart_definitions(dataset_ids: dict[str, int]) -> list[dict]:
-    """Return a list of chart payload dicts for Superset API v1."""
+SQL_DW_JOINED = """
+SELECT 
+  f.order_item_key,
+  f.order_id,
+  f.price,
+  f.freight_value,
+  f.item_revenue,
+  f.delivery_time_days,
+  f.review_score,
+  o.order_status,
+  o.order_purchase_timestamp,
+  p.product_category_name_english,
+  s.seller_id,
+  s.seller_city,
+  s.seller_state,
+  c.customer_city,
+  c.customer_state
+FROM olist_dw.fact_order_items f
+LEFT JOIN olist_dw.dim_orders o ON f.order_id = o.order_id
+LEFT JOIN olist_dw.dim_products p ON f.product_id = p.product_id
+LEFT JOIN olist_dw.dim_sellers s ON f.seller_id = s.seller_id
+LEFT JOIN olist_dw.dim_customers c ON f.customer_id = c.customer_id
+"""
+
+SQL_PAYMENTS_JOINED = """
+SELECT 
+  pay.payment_type,
+  pay.payment_value,
+  o.order_purchase_timestamp
+FROM olist_dw.dim_payments pay
+LEFT JOIN olist_dw.dim_orders o ON pay.order_id = o.order_id
+"""
+
+
+def build_chart_definitions(dw_joined_id: int, payments_joined_id: int) -> list[dict]:
     return [
         {
-            "slice_name": "Orders Over Time",
-            "description": "Monthly order count over time",
+            "slice_name": "1. Monthly Revenue Trends",
+            "description": "Total order item revenue aggregated by month",
             "viz_type": "echarts_timeseries_line",
-            "datasource_id": dataset_ids["orders"],
+            "datasource_id": dw_joined_id,
             "datasource_type": "table",
-            "params": '{"metrics":["count"],"groupby":[],"time_column":"order_purchase_timestamp","time_grain_sqla":"P1M","row_limit":10000}',
+            "params": '{"metrics":[{"label":"revenue","expressionType":"SQL","sqlExpression":"SUM(item_revenue)"}],"groupby":[],"time_column":"order_purchase_timestamp","time_grain_sqla":"P1M","row_limit":50000}',
         },
         {
-            "slice_name": "Payment Method Distribution",
-            "description": "Distribution of payment types across all orders",
-            "viz_type": "pie",
-            "datasource_id": dataset_ids["order_payments"],
-            "datasource_type": "table",
-            "params": '{"metrics":["count"],"groupby":["payment_type"],"row_limit":100}',
-        },
-        {
-            "slice_name": "Customer Geography — Top 20 Cities",
-            "description": "Top 20 cities by customer count",
+            "slice_name": "2. Revenue by Product Category (Top 15)",
+            "description": "Top product categories by total item revenue",
             "viz_type": "echarts_timeseries_bar",
-            "datasource_id": dataset_ids["customers"],
+            "datasource_id": dw_joined_id,
             "datasource_type": "table",
-            "params": '{"metrics":["count"],"groupby":["customer_city"],"order_desc":true,"row_limit":20}',
+            "params": '{"metrics":[{"label":"revenue","expressionType":"SQL","sqlExpression":"SUM(item_revenue)"}],"groupby":["product_category_name_english"],"order_desc":true,"row_limit":15}',
         },
         {
-            "slice_name": "Revenue by Product Category",
-            "description": "Total revenue per product category (top 15)",
+            "slice_name": "3. Top-Performing Sellers (Top 15)",
+            "description": "Top 15 sellers by total item revenue generated",
             "viz_type": "echarts_timeseries_bar",
-            "datasource_id": dataset_ids["order_items"],
+            "datasource_id": dw_joined_id,
             "datasource_type": "table",
-            "params": '{"metrics":[{"label":"total_revenue","expressionType":"SQL","sqlExpression":"SUM(price)"}],"groupby":["product_id"],"order_desc":true,"row_limit":15}',
+            "params": '{"metrics":[{"label":"revenue","expressionType":"SQL","sqlExpression":"SUM(item_revenue)"}],"groupby":["seller_id"],"order_desc":true,"row_limit":15}',
         },
         {
-            "slice_name": "Order Status Breakdown",
-            "description": "Breakdown of orders by their current status",
+            "slice_name": "4. Sales by Customer State",
+            "description": "Total revenue generated by customer state",
             "viz_type": "pie",
-            "datasource_id": dataset_ids["orders"],
+            "datasource_id": dw_joined_id,
             "datasource_type": "table",
-            "params": '{"metrics":["count"],"groupby":["order_status"],"row_limit":50}',
+            "params": '{"metrics":[{"label":"revenue","expressionType":"SQL","sqlExpression":"SUM(item_revenue)"}],"groupby":["customer_state"],"row_limit":30}',
+        },
+        {
+            "slice_name": "5. Average Delivery Time by State (Days)",
+            "description": "Average actual delivery days grouped by customer state",
+            "viz_type": "echarts_timeseries_bar",
+            "datasource_id": dw_joined_id,
+            "datasource_type": "table",
+            "params": '{"metrics":[{"label":"avg_delivery_days","expressionType":"SQL","sqlExpression":"AVG(delivery_time_days)"}],"groupby":["customer_state"],"order_desc":true,"row_limit":30}',
+        },
+        {
+            "slice_name": "6. Payment Method Trends (Value)",
+            "description": "Evolution of payment methods over time by value",
+            "viz_type": "echarts_timeseries_line",
+            "datasource_id": payments_joined_id,
+            "datasource_type": "table",
+            "params": '{"metrics":[{"label":"total_value","expressionType":"SQL","sqlExpression":"SUM(payment_value)"}],"groupby":["payment_type"],"time_column":"order_purchase_timestamp","time_grain_sqla":"P1M","row_limit":5000}',
+        },
+        {
+            "slice_name": "7. Average Review Score by Product Category (Top 15)",
+            "description": "Average review score per product category",
+            "viz_type": "echarts_timeseries_bar",
+            "datasource_id": dw_joined_id,
+            "datasource_type": "table",
+            "params": '{"metrics":[{"label":"avg_review_score","expressionType":"SQL","sqlExpression":"AVG(review_score)"}],"groupby":["product_category_name_english"],"order_desc":true,"row_limit":15}',
         },
     ]
 
@@ -206,7 +258,6 @@ def build_chart_definitions(dataset_ids: dict[str, int]) -> list[dict]:
 # ── main ──────────────────────────────────────────────────────────────
 
 def wait_for_superset(base_url: str, retries: int) -> None:
-    """Block until Superset health endpoint responds."""
     url = f"{base_url}/health"
     for attempt in range(1, retries + 1):
         try:
@@ -226,54 +277,36 @@ def main() -> None:
     args = parse_args()
     base_url = args.superset_url
 
-    # 1. Wait for Superset
     print("--- Waiting for Superset ---")
     wait_for_superset(base_url, args.retries)
 
-    # 2. Authenticate
     print("\n--- Authenticating ---")
     client = SupersetClient(base_url)
     client.login(ADMIN_USERNAME, ADMIN_PASSWORD)
     print("  -> Logged in as admin.")
 
-    # 3. Create database connection
-    print("\n--- Creating Spark Database Connection ---")
-    db_id = client.create_database(SPARK_DB_NAME, SPARK_SQLALCHEMY_URI)
+    print("\n--- Creating Spark DW Database Connection ---")
+    db_id = client.create_database(SPARK_DW_DB_NAME, SPARK_DW_SQLALCHEMY_URI)
 
-    # 4. Create datasets (one per Olist table)
-    print("\n--- Creating Datasets ---")
-    table_names = [
-        "customers",
-        "geolocation",
-        "order_items",
-        "order_payments",
-        "order_reviews",
-        "orders",
-        "products",
-        "sellers",
-        "product_category_name_translation",
-    ]
-    dataset_ids: dict[str, int] = {}
-    for table in table_names:
-        dataset_ids[table] = client.create_dataset(table, db_id)
+    print("\n--- Creating Virtual Joined Datasets ---")
+    dw_joined_id = client.create_virtual_dataset("dw_olist_joined", SQL_DW_JOINED, db_id)
+    payments_joined_id = client.create_virtual_dataset("dw_payments_joined", SQL_PAYMENTS_JOINED, db_id)
 
-    # 5. Create charts
-    print("\n--- Creating Charts ---")
-    chart_defs = build_chart_definitions(dataset_ids)
+    print("\n--- Creating 7 Business BI Charts ---")
+    chart_defs = build_chart_definitions(dw_joined_id, payments_joined_id)
     chart_ids: list[int] = []
     for chart_def in chart_defs:
         chart_ids.append(client.create_chart(chart_def))
 
-    # 6. Create dashboard
-    print("\n--- Creating Dashboard ---")
+    print("\n--- Creating Business BI Dashboard ---")
     client.create_dashboard(
-        title="Olist E-Commerce Overview",
-        slug="olist-overview",
+        title="Olist Business Intelligence (Star Schema)",
+        slug="olist-bi",
         chart_ids=chart_ids,
     )
 
-    print("\n[OK] Bootstrap complete!")
-    print(f"   Open Superset at {base_url} and check the 'Olist E-Commerce Overview' dashboard.")
+    print("\n[OK] Phase 2 Bootstrap complete!")
+    print(f"   Open Superset at {base_url} and check the 'Olist Business Intelligence (Star Schema)' dashboard.")
 
 
 if __name__ == "__main__":

@@ -63,9 +63,9 @@ def build_spark(master: str | None) -> SparkSession:
 def table_name_from_csv(csv_path: Path) -> str:
     name = csv_path.stem
     if name.startswith("olist_"):
-        name = name.removeprefix("olist_")
+        name = name[len("olist_"):]
     if name.endswith("_dataset"):
-        name = name.removesuffix("_dataset")
+        name = name[:-len("_dataset")]
     return name
 
 
