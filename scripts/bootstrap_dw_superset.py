@@ -85,6 +85,15 @@ class SupersetClient:
             raise e
         return resp.json()
 
+    def _put(self, endpoint: str, json_body: dict) -> dict:
+        resp = self.session.put(f"{self.base_url}{endpoint}", json=json_body)
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP Error details: {resp.text}")
+            raise e
+        return resp.json()
+
     def _get(self, endpoint: str, params: dict | None = None) -> dict:
         resp = self.session.get(f"{self.base_url}{endpoint}", params=params)
         resp.raise_for_status()
@@ -154,17 +163,64 @@ class SupersetClient:
 
     def create_dashboard(self, title: str, slug: str, chart_ids: list[int]) -> int:
         existing_id = self.find_dashboard(slug)
+        position_data = generate_position_json(chart_ids)
         if existing_id:
-            print(f"  -> Dashboard '{title}' already exists (id={existing_id}).")
+            print(f"  -> Dashboard '{title}' already exists (id={existing_id}), updating charts layout...")
+            self._put(f"/api/v1/dashboard/{existing_id}", {
+                "position_json": position_data
+            })
             return existing_id
         data = self._post("/api/v1/dashboard/", {
             "dashboard_title": title,
             "slug": slug,
+            "position_json": position_data,
             "published": True,
         })
         dash_id = data.get("id")
         print(f"  -> Created dashboard '{title}' (id={dash_id}).")
         return dash_id
+
+
+def generate_position_json(chart_ids: list[int]) -> str:
+    import json
+    position = {
+        "DASHBOARD_VERSION_KEY": "v2",
+        "ROOT_ID": {
+            "type": "ROOT",
+            "id": "ROOT_ID",
+            "children": ["GRID_ID"]
+        },
+        "GRID_ID": {
+            "type": "GRID",
+            "id": "GRID_ID",
+            "children": []
+        }
+    }
+    
+    for i, cid in enumerate(chart_ids):
+        chart_key = f"CHART-{cid}"
+        position[chart_key] = {
+            "type": "CHART",
+            "id": chart_key,
+            "children": [],
+            "meta": {
+                "width": 6,
+                "height": 50,
+                "chartId": cid
+            }
+        }
+        row_idx = i // 2 + 1
+        row_key = f"ROW-{row_idx}"
+        if row_key not in position:
+            position[row_key] = {
+                "type": "ROW",
+                "id": row_key,
+                "children": []
+            }
+            position["GRID_ID"]["children"].append(row_key)
+        position[row_key]["children"].append(chart_key)
+        
+    return json.dumps(position)
 
 
 # ── queries & charts ──────────────────────────────────────────────────
